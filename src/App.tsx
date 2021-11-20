@@ -1,6 +1,20 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import useMeasure from "react-use-measure";
 import { useSpring, animated } from "react-spring";
+
+const resolveIcon = (key: string): string => {
+	let result = '';
+	switch (key) {
+		case "plasma":
+		case "plasmawayland":
+			result = "kde.svg";
+			break;
+		default:
+			result = 'unknown';
+			break;
+	}
+	return result;
+}
 
 function App() {
 	const [password, setPassword] = useState("");
@@ -8,50 +22,14 @@ function App() {
 
 	const [route, setRoute] = useState("users");
 
-	const users: Array<{ avatar: string; username: string }> = [
-		{
-			avatar: "https://i.ibb.co/zXXyRg3/beidou.jpg",
-			username: "Luis Bizarro",
-		},
-		{
-			avatar: "https://avatarfiles.alphacoders.com/280/thumb-280977.png",
-			username: "Ningguang",
-		},
-		{
-			avatar: "https://avatarfiles.alphacoders.com/280/thumb-280958.png",
-			username: "Zhongli",
-		},
-		{
-			avatar: "https://pbs.twimg.com/media/EwOclF2XEAUY_Yl.png",
-			username: "Diluc",
-		},
-	];
+	const users = lightdm.users;
 
-	const desktops: Array<{ logo: string; name: string }> = [
-		{
-			logo: "kde.svg",
-			name: "KDE Plasma",
-		},
-		{
-			logo: "gnome.svg",
-			name: "Gnome",
-		},
-		{
-			logo: "i3wm.svg",
-			name: "I3WM",
-		},
-		{
-			logo: "awesomewm.svg",
-			name: "AwesomeWM",
-		},
-		{
-			logo: "sway.svg",
-			name: "Sway",
-		},
-	];
+	const sessions = lightdm.sessions;
 
 	const [currentUser, setCurrentUser] = useState(0);
-	const [currentDesktop, setCurrentDesktop] = useState(0);
+	const [currentSession, setCurrentSession] = useState<number>(
+		Number(localStorage.getItem('defaultSession')) || 0
+	);
 
 	const [ref, { width }] = useMeasure();
 	const expandedProps = useSpring({
@@ -62,24 +40,31 @@ function App() {
 		from: { right: -width },
 	});
 
+	// No idea if this works at all.
+	const login = useCallback(async () => {
+		lightdm.authenticate(users[currentUser].username);
+		lightdm.respond(password);
+		lightdm.start_session(sessions[currentSession].key);
+	}, [users, currentUser, password, sessions, currentSession]);
+
 	return (
 		<div className="text-white h-full w-full absolute inset-0 overflow-hidden select-none">
 			<img
-				src="https://i.ibb.co/zXXyRg3/beidou.jpg"
+				src={users[currentUser].background || "./backgrounds/Beidou.jpg"}
 				alt="Background"
 				className="absolute inset-0 h-full w-full object-cover object-center z-0 filter blur transform scale-105"
 			/>
 			<div className="absolute inset-0 h-full w-full z-10 flex justify-between items-center mx-auto">
-				<form className="flex flex-col justify-center items-center gap-4 mx-auto pr-14">
+				<form className="grid auto-rows-auto grid-cols-1 justify-center items-center place-items-center gap-3 mx-auto pr-14">
 					<img
-						src={users[currentUser].avatar}
-						alt={users[currentUser].username}
+						src={users[currentUser].image}
+						alt={users[currentUser].display_name}
 						className="h-36 w-36 object-cover object-center rounded-full"
 					/>
 					<div className="font-sans font-medium text-lg text-center">
-						{users[currentUser].username}
+						{users[currentUser].display_name}
 					</div>
-					<div className="flex gap-3">
+					<div className="grid grid-rows-1 grid-cols-2-auto gap-2">
 						<input
 							type="password"
 							value={password}
@@ -93,6 +78,7 @@ function App() {
 						<button
 							type="button"
 							className="outline-none py-1.5 px-2 rounded font-normal text-base bg-black bg-opacity-10 transition-colors text-white text-opacity-70 hover:text-white hover:bg-black hover:bg-opacity-20"
+							onClick={() => login()}
 						>
 							<svg
 								width="20"
@@ -126,7 +112,7 @@ function App() {
 						<div className="h-full py-3 px-2">
 							<div className="flex flex-col justify-between h-full">
 								{(users.length !== 1 ||
-									desktops.length !== 1) && (
+									sessions.length !== 1) && (
 									<button
 										className="p-2 rounded transition-colors bg-transparent hover:bg-white hover:bg-opacity-5"
 										onClick={() => setExpanded(!expanded)}
@@ -151,66 +137,64 @@ function App() {
 									</button>
 								)}
 								<div className="flex flex-col gap-1.5 mt-auto">
-									{users.length !== 1 && (
-										<button
-											className={`p-2 rounded transition-colors ${
-												expanded && route === "users"
-													? "bg-white bg-opacity-10"
-													: "bg-transparent hover:bg-white hover:bg-opacity-5"
-											}`}
-											onClick={() => {
-												setRoute("users");
-												setExpanded(true);
-											}}
+									<button
+										className={`p-2 rounded transition-colors ${
+											expanded && route === "users"
+												? "bg-white bg-opacity-10"
+												: "bg-transparent hover:bg-white hover:bg-opacity-5"
+										}`}
+										onClick={() => {
+											setRoute("users");
+											setExpanded(true);
+										}}
+									>
+										<svg
+											width="24"
+											height="24"
+											fill="none"
+											viewBox="0 0 24 24"
 										>
-											<svg
-												width="24"
-												height="24"
-												fill="none"
-												viewBox="0 0 24 24"
-											>
-												<path
-													stroke="currentColor"
-													strokeLinecap="round"
-													strokeLinejoin="round"
-													strokeWidth="1.5"
-													d="M5.78168 19.25H13.2183C13.7828 19.25 14.227 18.7817 14.1145 18.2285C13.804 16.7012 12.7897 14 9.5 14C6.21031 14 5.19605 16.7012 4.88549 18.2285C4.773 18.7817 5.21718 19.25 5.78168 19.25Z"
-												></path>
-												<path
-													stroke="currentColor"
-													strokeLinecap="round"
-													strokeLinejoin="round"
-													strokeWidth="1.5"
-													d="M15.75 14C17.8288 14 18.6802 16.1479 19.0239 17.696C19.2095 18.532 18.5333 19.25 17.6769 19.25H16.75"
-												></path>
-												<circle
-													cx="9.5"
-													cy="7.5"
-													r="2.75"
-													stroke="currentColor"
-													strokeLinecap="round"
-													strokeLinejoin="round"
-													strokeWidth="1.5"
-												></circle>
-												<path
-													stroke="currentColor"
-													strokeLinecap="round"
-													strokeLinejoin="round"
-													strokeWidth="1.5"
-													d="M14.75 10.25C16.2688 10.25 17.25 9.01878 17.25 7.5C17.25 5.98122 16.2688 4.75 14.75 4.75"
-												></path>
-											</svg>
-										</button>
-									)}
-									{desktops.length !== 1 && (
+											<path
+												stroke="currentColor"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												strokeWidth="1.5"
+												d="M5.78168 19.25H13.2183C13.7828 19.25 14.227 18.7817 14.1145 18.2285C13.804 16.7012 12.7897 14 9.5 14C6.21031 14 5.19605 16.7012 4.88549 18.2285C4.773 18.7817 5.21718 19.25 5.78168 19.25Z"
+											></path>
+											<path
+												stroke="currentColor"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												strokeWidth="1.5"
+												d="M15.75 14C17.8288 14 18.6802 16.1479 19.0239 17.696C19.2095 18.532 18.5333 19.25 17.6769 19.25H16.75"
+											></path>
+											<circle
+												cx="9.5"
+												cy="7.5"
+												r="2.75"
+												stroke="currentColor"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												strokeWidth="1.5"
+											></circle>
+											<path
+												stroke="currentColor"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												strokeWidth="1.5"
+												d="M14.75 10.25C16.2688 10.25 17.25 9.01878 17.25 7.5C17.25 5.98122 16.2688 4.75 14.75 4.75"
+											></path>
+										</svg>
+									</button>
+									{sessions.length !== 1 && (
 										<button
 											className={`p-2 rounded transition-colors ${
-												expanded && route === "desktops"
+												expanded && route === "sessions"
 													? "bg-white bg-opacity-10"
 													: "bg-transparent hover:bg-white hover:bg-opacity-5"
 											}`}
 											onClick={() => {
-												setRoute("desktops");
+												setRoute("sessions");
 												setExpanded(true);
 											}}
 										>
@@ -316,41 +300,41 @@ function App() {
 											onClick={() => setCurrentUser(idx)}
 										>
 											<img
-												src={user.avatar}
-												alt={user.username}
+												src={user.image}
+												alt={user.display_name}
 												className="h-24 w-24 object-cover object-center rounded-full"
 											/>
 											<div className="font-sans font-medium text-base text-center mt-3">
-												{user.username}
+												{user.display_name}
 											</div>
 										</button>
 									))}
 								</>
 							) : (
-								route === "desktops" && (
+								route === "sessions" && (
 									<>
-										{desktops.map((desktop, idx) => (
+										{sessions.map((session, idx) => (
 											<button
-												key={`desktop-${idx}`}
+												key={`session-${idx}`}
 												disabled={
-													idx === currentDesktop
+													idx === currentSession
 												}
 												className={`rounded transition-all ${
-													idx === currentDesktop
+													idx === currentSession
 														? "bg-black bg-opacity-25"
 														: "bg-black bg-opacity-10 hover:bg-white hover:bg-opacity-5 opacity-75 hover:opacity-100"
 												} h-44 w-44 flex flex-col items-center justify-center p-3`}
 												onClick={() =>
-													setCurrentDesktop(idx)
+													setCurrentSession(idx)
 												}
 											>
 												<img
-													src={`/desktops/${desktop.logo}`}
-													alt={desktop.name}
+													src={`./sessions/${resolveIcon(session.key)}`}
+													alt={session.name}
 													className="h-16 w-16 object-contain object-center"
 												/>
 												<div className="font-sans font-medium text-base text-center mt-3">
-													{desktop.name}
+													{session.name}
 												</div>
 											</button>
 										))}
