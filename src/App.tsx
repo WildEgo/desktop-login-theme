@@ -41,10 +41,12 @@ function App() {
 	});
 
 	// No idea if this works at all.
-	const login = useCallback(async () => {
+	const login = useCallback(() => {
 		lightdm.authenticate(users[currentUser].username);
-		lightdm.respond(password);
-		lightdm.start_session(sessions[currentSession].key);
+		setTimeout(() => {
+			lightdm.respond(password);
+			lightdm.start_session(sessions[currentSession].key);
+		}, 100);
 	}, [users, currentUser, password, sessions, currentSession]);
 
 	return (
